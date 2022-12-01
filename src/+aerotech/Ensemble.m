@@ -1,15 +1,23 @@
 classdef Ensemble < aerotech.EnsembleAbstract
 
+
+    % A downside of the native C libraries is that they were not set up to create a
+    % separate communication client for each mapped Aerotech controller.  Instead
+    % EnsembleConnect returns an array of handles 
+
+    % bitand(uint8(bin2dec('011')), uint8(bin2dec('010'))
+
     properties (Constant)
 
-        u8AXIS_X = 0
-        u8AXIS_Y = 1
-
+        
     end
 
     properties (Access = private)
 
-      dSpeed = [5 5]
+      dSpeed = []
+      handles = []
+
+      lDebug = true
 
     end
 
@@ -30,30 +38,108 @@ classdef Ensemble < aerotech.EnsembleAbstract
             this.init()
         end
 
-        function findReferenceMark(this, u8Axis)
-
-            this.msg(sprintf('findReferenceMark %d', u8Axis));
-            EnsembleMotionHome(this.handle, u8Axis)
+        function findReferenceMark(this, u8Index, u8Axis)
+            this.msg(sprintf('findReferenceMark index: %d, axis: %d', u8Index, u8Axis));
+            EnsembleMotionHome(this.handles(u8Index), u8Axis)
 
         end
 
-        function setPosition(this, u8Axis, dPosition)
-          EnsembleMotionMoveAbs(this.handle, u8Axis, dPosition, this.dSpeed(u8Axis))
+        function l = getIsReferenced(this, u8Index, u8Axis)
+
+            statusMask = EnsembleStatusGetItem(this.handles(u8Index), u8Axis, EnsembleStatusItem.AxisStatus);
+            l = bitand(uint32(statusMask), uint32(EnsembleAxisStatus.Homed)) > 0;
         end
 
+        function setPosition(this, u8Index, u8Axis, dPosition)
+            EnsembleMotionWaitMode(this.handles(u8Index), u8Axis, 0);
+            EnsembleMotionMoveAbs(this.handles(u8Index), u8Axis, dPosition, this.dSpeed(u8Index, u8Axis + 1))
+        end
+
+        function d = getPosition(this, u8Index, u8Axis)
+            d = EnsembleStatusGetItem(this.handles(u8Index), u8Axis, EnsembleStatusItem.PositionFeedback);
+        end
+
+        
+        function l = getIsMoving(this, u8Index, u8Axis)
+            statusMask = EnsembleStatusGetItem(this.handles(u8Index), u8Axis, EnsembleStatusItem.AxisStatus);
+            l = bitand(uint32(statusMask), uint32(EnsembleAxisStatus.MoveActive)) > 0;
+        end
+        
+
+        function setSpeed(this, u8Index, u8Axis, dSpeed)
+            this.dSpeed(u8Index, u8Axis + 1) = dSpeed;
+        end
+        
+        function d = getSpeed(this, u8Index, u8Axis)
+            d = this.dSpeed(u8Index, u8Axis + 1);
+        end
 
         function delete(this)
 
             this.msg('delete()');
-            EnsembleMotionDisable(this.handle, this.u8AXIS_X)
-            EnsembleMotionDisable(this.handle, this.u8AXIS_Y)
+            this.evalAll(@this.disable);
             EnsembleDisconnect();
-
         end
 
     end
 
     methods (Access = private)
+
+
+        % TO DO NEXT UP
+        function clearFaults(this)
+
+        end
+
+        % Loops through available controllers and axes and calls the passed function
+        % Passes handle, axis, idxHandle, and idxAxis to the function
+        % @param {function_handle} fh that takes two arguments: handle and axis
+        function evalAll(this, fh)
+
+            [axes] = enumeration('aerotech.Axis');
+
+            for idxH = 1:length(this.handles)
+                
+                axisMask = EnsembleInformationGetAxisMask(this.handles(idxH)); % Gets the available axes of a controller.
+
+                for idxA = 1:length(axes)
+
+                    idxMask = bitshift(1, idxA - 1); 
+                    lAvailable = bitand(axisMask, idxMask) > 0;
+
+                    if ~lAvailable
+                        continue
+                    end
+
+                    fh(this.handles(idxH), axes(idxA), idxH, idxA);
+
+                    
+                end
+            end
+        end
+
+        function disable(this, handle, axis, idxH, idxA)
+
+            try
+                EnsembleMotionDisable(handle, axis);
+                cMsg = strjoin({...
+                    'disable', ...
+                    sprintf('controller: %d', idxH), ...
+                    sprintf('axis %d %s', idxA, axis), ...
+                }, ' ');
+                this.msg(cMsg);
+
+            catch mE
+                cMsg = strjoin({...
+                    'disable', ...
+                    mE.message, ...
+                    sprintf('controller: %d', idxH), ...
+                    sprintf('axis %d %s', idxA, axis), ...
+                }, '; ');
+                this.msg(cMsg);
+            end
+        end
+
 
         function loadVendorLibs(this)
 
@@ -62,6 +148,8 @@ classdef Ensemble < aerotech.EnsembleAbstract
 
             cDirThis = fileparts(mfilename('fullpath'));
             cDirAerotech = fullfile(cDirThis, '..', '..', 'vendor', 'aerotech');
+            
+            cDirAerotech = this.path2canonical(cDirAerotech);
 
             arch = computer('arch');
 
@@ -71,27 +159,87 @@ classdef Ensemble < aerotech.EnsembleAbstract
             else (strcmp(arch, 'win64'))
                 cDir = fullfile(cDirAerotech, 'x64');
                 addpath(cDir);
-                cDir = fullfile(cDirAerotech, 'AeroBasic');
-                addpath(genpath(cDir)); % genpath recursively crawls to get all subfolders
+                % cDir = fullfile(cDirAerotech, 'AeroBasic');
+                % addpath(genpath(cDir)); % genpath recursively crawls to get all subfolders
 
             end
 
         end
 
-        function this = init(this)
-            this.loadVendorLibs();
-            this.handle = EnsembleConnect;
-            EnsembleMotionEnable(this.handle, this.u8AXIS_X)
-            EnsembleMotionEnable(this.handle, this.u8AXIS_Y)
+        function enable(this, handle, axis, idxH, idxA)
 
-            % Populate initial speed
-            this.dSpeed(1) = EnsembleMotionGetSpeed(this.handle, this.u8AXIS_X);
-            this.dSpeed(2) = EnsembleMotionGetSpeed(this.handle, this.u8AXIS_Y);
+            try
+                EnsembleMotionEnable(handle, axis);
+                cMsg = strjoin({...
+                    'enable', ...
+                    sprintf('controller: %d', idxH), ...
+                    sprintf('axis %d %s', idxA, axis), ...
+                }, ' ');
+                this.msg(cMsg);
+
+            catch mE
+                cMsg = strjoin({...
+                    'enable()', ...
+                    mE.message, ...
+                    sprintf('controller: %d', idxH), ...
+                    sprintf('axis %d %s', idxA, axis), ...
+                }, '; ');
+                this.msg(cMsg);
+            end
+        end
+
+        function populateSpeed(this, handle, axis, idxH, idxA)
+            try
+                this.dSpeed(idxH, idxA) = EnsembleStatusGetItem(handle, axis, EnsembleStatusItem.VelocityCommand);
+                cMsg = strjoin({...
+                    'populateSpeed', ...
+                    sprintf('controller: %d', idxH), ...
+                    sprintf('axis %d %s', idxA, axis), ...
+                    sprintf('speed = %1.1f', this.dSpeed(idxH, idxA)), ...
+                }, '; ');
+                this.msg(cMsg);
+            catch mE
+                cMsg = strjoin({...
+                    'populateSpeed', ...
+                    mE.message, ...
+                    sprintf('controller: %d', idxH), ...
+                    sprintf('axis %d %s', idxA, axis), ...
+                }, '; ');
+                this.msg(cMsg);
+                
+            end
+        end
+
+
+        % Connect to all the mapped Ensembles that are available on the Network.
+        % "Mapping" is done with the Aerotech Ensemble
+        % ConfigurationManager.exe which will be installed at 
+
+        function connect(this)
+
+            if (isempty(this.handles))
+                this.handles = EnsembleConnect();
+            end
 
         end
 
+        function init(this)
+            this.loadVendorLibs();
+            this.connect();
+            this.evalAll(@this.enable);
+            this.evalAll(@this.populateSpeed);
+        end
+
         function msg(this, cMsg)
-            fprintf('aerotech.Ensemble %s\n', cMsg);
+            this.lDebug & fprintf('aerotech.Ensemble %s\n', cMsg);
+        end
+        
+        % Convert a relative directory path into a canonical path
+        % i.e., C:\A\B\..\C becomes C:\A\C.  Uses java io interface
+        
+        function c = path2canonical(this, cPath)
+           jFile = java.io.File(cPath);
+           c = char(jFile.getCanonicalPath);
         end
 
     end

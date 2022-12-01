@@ -4,20 +4,17 @@ classdef EnsembleAbstract < handle
     
     methods (Abstract)
         
-        %@param {uint32} absolute position to move to in mm
-        goToPositionAbsolute(this, u32Channel, dPosition)
+        findReferenceMark(this, u8Handle, u8Axis)
+        l = getIsReferenced(this, u8Handle, u8Axis) 
 
-        findReferenceMark(this, u32Channel)
-        
-        l = getIsReferenced(this, u32Channel) 
-        l = getIsMoving(this, u32Channel)
            
-        setPosition(this.u32Channel, dPosition)
-        dPosition = getPosition(this, u32Channel)
+        setPosition(this, u8Handle, u8Axis, dPosition)
+        dPosition = getPosition(this, u8Handle, u8Axis)
+        l = getIsMoving(this, u8Handle, u8Axis)
 
-        setSpeed(this, u32Channel, dSpeed)
-        getSpeed(this, u32Channel)
 
+        setSpeed(this, u8Handle, u8Axis, dSpeed)
+        getSpeed(this, u8Handle, u8Axis)
         
     end
     
