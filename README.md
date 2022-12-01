@@ -3,12 +3,11 @@ MATLAB communication class for Aerotech Ensemble motion controller
 
 Only Matlab base with the provided Matlab library package are sufficient. There is no need for any Matlab toolbox or Simulink.
 
-
-## Installation and dependencies
-
-This package requires installation of the Aerotech Ensemble software that shipped with the controller.  The Aerotech Ensemble software ships with a MATLAB communication library that this code uses.  
+## Instructions
 
 ### 1. Install Aerotech Ensemble software
+
+This package requires installation of the Aerotech Ensemble software that shipped with the controller.  The Aerotech Ensemble software ships with a MATLAB communication library that this code uses. If you are at Berkeley Lab, the contents of the Aerotech Ensemble USB / Thumb drive can be downloaded from Google Drive [here](https://drive.google.com/drive/folders/1AqtE8ZvXBEfvqQukng4vdDdi1-JT11CC?usp=share_link)
 
 The install location will usually be something like C:\Program Files (x86)\Aerotech\Ensemble
 
@@ -18,20 +17,15 @@ The install location will usually be something like C:\Program Files (x86)\Aerot
 
 "Mapping" is done with the Aerotech Ensemble ConfigurationManager.exe which will be installed at C:\Program Files (x86)\Aerotech\Ensemble\Bin\ConfigurationManager.exe
 
-After installing Matlab and the Aerotech Ensemble software, locate the folder of Matlab in the Ensemble installation folder. Usually its address can be as follows.
+Inside ConfigurationManager app, go to the Controller menu -> Connection Settings and map available devices 
 
+### 4. Create vendor/aerotech directory in this repo
 
-### Copy C:\Program Files (x86)\Aerotech\Ensemble\Matlab\x64 and \x86 into vendor/aerotech
+### 5. Copy MATLAB libs into vendor/aerotech
 
-**The library should already be copied into the vendor folder of this repository**
+- (64-bit) Copy C:\Program Files (x86)\Aerotech\Ensemble\Matlab\x64 into vendor/aerotech
+- (32-bit) Copy C:\Program Files (x86)\Aerotech\Ensemble\Matlab\x86 into vendor/aerotech
 
-The Matlab library package is stored in the folder of x64 (if your computer architecture is x64) inside the Matlab directory above. To make sure that you do not modify any files in this Matlab library, you can copy the entire x64 folder and paste it into another location. For example, it can be placed in C:\Users\cxrodev\Documents\MATLAB\Aerotech
-
-### Copy C:\Program Files (x86)\Aerotech\Ensemble\AeroBasic into vendor/aerotech
-
-**The library should already be copied into the vendor folder of this repository**
-
-After that, in vendor/aerotech there are two folders, x64 and AeroBasic.
 
 
 
