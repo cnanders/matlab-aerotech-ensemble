@@ -31,6 +31,14 @@ To do: figure out what file on the machine gets modified after mapping is done. 
 - (64-bit) Copy C:\Program Files (x86)\Aerotech\Ensemble\Matlab\x64 into vendor/aerotech
 - (32-bit) Copy C:\Program Files (x86)\Aerotech\Ensemble\Matlab\x86 into vendor/aerotech
 
+## Testing
+
+Use C:\Program Files (x86)\Aerotech\Ensemble\Bin\MotionComposer.exe to control the stage with native software.  When the app is opened go to Controller (menu) -> Connect.
+
+Useful to use this MATLAB comm class to perform actions and see the UI update in MotionComposer, reflecting that the MATLAB code works.
+
+When first opening.
+
 
 
 
