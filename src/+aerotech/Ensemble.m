@@ -6,6 +6,8 @@ classdef Ensemble < aerotech.EnsembleAbstract
     % EnsembleConnect returns an array of handles 
 
     % bitand(uint8(bin2dec('011')), uint8(bin2dec('010'))
+    
+    % how to convert a status mask to 
 
     properties (Constant)
 
@@ -38,8 +40,21 @@ classdef Ensemble < aerotech.EnsembleAbstract
             this.init()
         end
 
+        % Stops motion of all axes of a controller.  There is no way to stop
+        % a single axis.  This is a limitation of the Aerotech Ensemble API.
+        function stop(this, u8Index, u8Axis)
+
+            mask = zeros(1, length(enumeration('aerotech.Axis')));
+            mask(u8Axis + 1) = 1;
+            % EnsembleMotionHalt(this.handles(u8Index));
+            % EnsembleMotionFreeRunStop(this.handles(u8Index), 1);
+            EnsembleMotionAbort(this.handles(u8Index), mask);
+            
+        end
+        
         function findReferenceMark(this, u8Index, u8Axis)
             this.msg(sprintf('findReferenceMark index: %d, axis: %d', u8Index, u8Axis));
+            EnsembleMotionWaitMode(this.handles(u8Index), 0);
             EnsembleMotionHome(this.handles(u8Index), u8Axis)
 
         end
@@ -51,7 +66,7 @@ classdef Ensemble < aerotech.EnsembleAbstract
         end
 
         function setPosition(this, u8Index, u8Axis, dPosition)
-            EnsembleMotionWaitMode(this.handles(u8Index), u8Axis, 0);
+            EnsembleMotionWaitMode(this.handles(u8Index), 0);
             EnsembleMotionMoveAbs(this.handles(u8Index), u8Axis, dPosition, this.dSpeed(u8Index, u8Axis + 1))
         end
 
@@ -65,6 +80,11 @@ classdef Ensemble < aerotech.EnsembleAbstract
             l = bitand(uint32(statusMask), uint32(EnsembleAxisStatus.MoveActive)) > 0;
         end
         
+        function mask = getStatusOfAxis(this, u8Index, u8Axis)
+            mask = EnsembleStatusGetItem(this.handles(u8Index), u8Axis, EnsembleStatusItem.AxisStatus);
+            mask = dec2bin(uint32(mask));  % convert to binary char array
+            
+        end
 
         function setSpeed(this, u8Index, u8Axis, dSpeed)
             this.dSpeed(u8Index, u8Axis + 1) = dSpeed;
@@ -80,16 +100,30 @@ classdef Ensemble < aerotech.EnsembleAbstract
             this.evalAll(@this.disable);
             EnsembleDisconnect();
         end
+        
+        % Clears faults on all controllers
+        function clearFaults(this, handle, axis, intH, intA )
+            for idxH = 1:length(this.handles)
+                try
+                EnsembleAcknowledgeAll(this.handles(idxH));
+                this.msg(sprintf('Cleared faults on controller %d', idxH));
+                
+                catch mE
+                    this.msg(sprintf('Failed to clear faults on controller %d %s', idxH, mE.message));
+                end
+
+            end
+        end
 
     end
 
     methods (Access = private)
 
 
-        % TO DO NEXT UP
-        function clearFaults(this)
+        
 
-        end
+
+
 
         % Loops through available controllers and axes and calls the passed function
         % Passes handle, axis, idxHandle, and idxAxis to the function
@@ -166,8 +200,11 @@ classdef Ensemble < aerotech.EnsembleAbstract
 
         end
 
+        % Enables motion on an axis of a controller
+        % @param {handle} handle to controller
+        % @param {aerotech.Axis} or int 0-5
+        
         function enable(this, handle, axis, idxH, idxA)
-
             try
                 EnsembleMotionEnable(handle, axis);
                 cMsg = strjoin({...
@@ -189,6 +226,13 @@ classdef Ensemble < aerotech.EnsembleAbstract
         end
 
         function populateSpeed(this, handle, axis, idxH, idxA)
+            
+            % Default to 5
+            % The Ensemble has no notion of storing a speed.
+            % Every 
+            this.dSpeed(idxH, idxA)= 5;
+            return;
+            
             try
                 this.dSpeed(idxH, idxA) = EnsembleStatusGetItem(handle, axis, EnsembleStatusItem.VelocityCommand);
                 cMsg = strjoin({...
@@ -226,6 +270,7 @@ classdef Ensemble < aerotech.EnsembleAbstract
         function init(this)
             this.loadVendorLibs();
             this.connect();
+            this.clearFaults();
             this.evalAll(@this.enable);
             this.evalAll(@this.populateSpeed);
         end
