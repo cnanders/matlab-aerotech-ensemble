@@ -40,8 +40,7 @@ classdef Ensemble < aerotech.EnsembleAbstract
             this.init()
         end
 
-        % Stops motion of all axes of a controller.  There is no way to stop
-        % a single axis.  This is a limitation of the Aerotech Ensemble API.
+        % Stops motion of an axis of a controller
         function stop(this, u8Index, u8Axis)
 
             mask = zeros(1, length(enumeration('aerotech.Axis')));
